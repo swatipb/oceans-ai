@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+service Detector {
+  // Sends a greeting
+  rpc Inference (InferenceRequest) returns (InferenceReply) {}
+}
+
+// The request message containing the user's name.
+message InferenceRequest {
+  repeated string file_paths = 1;
+  // A serialized tensor, directly using tf.io.serialize_tensor API.
+  bytes data = 2;
+}
+
+message BoundingBox {
+  string file_path = 1;
+  int32 class_id = 2;
+  float score = 3;
+  float left = 4;
+  float top = 5;
+  float width = 6;
+  float height = 7;
+}
+
+// The response message containing the greetings
+message InferenceReply {
+  repeated BoundingBox detections = 1;
+}
