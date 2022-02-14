@@ -33,6 +33,15 @@ The detector runs inference, and maintains gRPC endpoint to accept inference
 requests and returning detection results. `service.proto` defines the gRPC
 service.
 
+## Benchmark
+
+Simply measure the model's performance.
+
+```sh
+python benchmark.py \
+  --model_path=path/to/model --image_path=path/to/image/dir --batch_size=1
+```
+
 ## TODO
 
 *   Load management between poller and detector to achieve > 10fps performance.
