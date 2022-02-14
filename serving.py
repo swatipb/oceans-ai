@@ -36,7 +36,7 @@ class Detector(service_pb2_grpc.Detector):
     images = tf.io.parse_tensor(request.data, _IMAGE_TYPE)
     detections = self._model(images)
     result = service_pb2.InferenceReply()
-    img_w, img_h = images.shape[1:3]
+    img_h, img_w = images.shape[1:3]
 
     num_detections = detections['num_detections'].numpy().astype(np.int32)
     detection_boxes = detections['detection_boxes'].numpy()
