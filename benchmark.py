@@ -54,7 +54,7 @@ def main(unused_argv):
   for filenames, images in images_ds.batch(FLAGS.batch_size).take(_NUM_ITER):
     num_tries += 1
     if num_tries >= 5:
-      continue
+      break
     _ = model_fn(images)
 
   for filenames, images in images_ds.batch(FLAGS.batch_size).take(_NUM_ITER):
