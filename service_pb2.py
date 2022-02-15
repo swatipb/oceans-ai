@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\rservice.proto\"4\n\x10InferenceRequest\x12\x12\n\nfile_paths\x18\x01 \x03(\t\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c\"{\n\x0b\x42oundingBox\x12\x11\n\tfile_path\x18\x01 \x01(\t\x12\x10\n\x08\x63lass_id\x18\x02 \x01(\x05\x12\r\n\x05score\x18\x03 \x01(\x02\x12\x0c\n\x04left\x18\x04 \x01(\x02\x12\x0b\n\x03top\x18\x05 \x01(\x02\x12\r\n\x05width\x18\x06 \x01(\x02\x12\x0e\n\x06height\x18\x07 \x01(\x02\"2\n\x0eInferenceReply\x12 \n\ndetections\x18\x01 \x03(\x0b\x32\x0c.BoundingBox2=\n\x08\x44\x65tector\x12\x31\n\tInference\x12\x11.InferenceRequest\x1a\x0f.InferenceReply\"\x00\x62\x06proto3'
+  serialized_pb=b'\n\rservice.proto\"4\n\x10InferenceRequest\x12\x12\n\nfile_paths\x18\x01 \x03(\t\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c\"{\n\x0b\x42oundingBox\x12\x11\n\tfile_path\x18\x01 \x01(\t\x12\x10\n\x08\x63lass_id\x18\x02 \x01(\x05\x12\r\n\x05score\x18\x03 \x01(\x02\x12\x0c\n\x04left\x18\x04 \x01(\x02\x12\x0b\n\x03top\x18\x05 \x01(\x02\x12\r\n\x05width\x18\x06 \x01(\x02\x12\x0e\n\x06height\x18\x07 \x01(\x02\"2\n\x0eInferenceReply\x12 \n\ndetections\x18\x01 \x03(\x0b\x32\x0c.BoundingBox\"^\n\rTrackerResult\x12\x1f\n\tdetection\x18\x01 \x01(\x0b\x32\x0c.BoundingBox\x12\x13\n\x0bsequence_id\x18\x02 \x01(\x03\x12\x17\n\x0fsequence_length\x18\x03 \x01(\x03\"L\n\x0eTrackerResults\x12\x11\n\tfile_path\x18\x01 \x01(\t\x12\'\n\x0ftracker_results\x18\x02 \x03(\x0b\x32\x0e.TrackerResult2=\n\x08\x44\x65tector\x12\x31\n\tInference\x12\x11.InferenceRequest\x1a\x0f.InferenceReply\"\x00\x62\x06proto3'
 )
 
 
@@ -169,10 +169,99 @@ _INFERENCEREPLY = _descriptor.Descriptor(
   serialized_end=246,
 )
 
+
+_TRACKERRESULT = _descriptor.Descriptor(
+  name='TrackerResult',
+  full_name='TrackerResult',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='detection', full_name='TrackerResult.detection', index=0,
+      number=1, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='sequence_id', full_name='TrackerResult.sequence_id', index=1,
+      number=2, type=3, cpp_type=2, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='sequence_length', full_name='TrackerResult.sequence_length', index=2,
+      number=3, type=3, cpp_type=2, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=248,
+  serialized_end=342,
+)
+
+
+_TRACKERRESULTS = _descriptor.Descriptor(
+  name='TrackerResults',
+  full_name='TrackerResults',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='file_path', full_name='TrackerResults.file_path', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='tracker_results', full_name='TrackerResults.tracker_results', index=1,
+      number=2, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=344,
+  serialized_end=420,
+)
+
 _INFERENCEREPLY.fields_by_name['detections'].message_type = _BOUNDINGBOX
+_TRACKERRESULT.fields_by_name['detection'].message_type = _BOUNDINGBOX
+_TRACKERRESULTS.fields_by_name['tracker_results'].message_type = _TRACKERRESULT
 DESCRIPTOR.message_types_by_name['InferenceRequest'] = _INFERENCEREQUEST
 DESCRIPTOR.message_types_by_name['BoundingBox'] = _BOUNDINGBOX
 DESCRIPTOR.message_types_by_name['InferenceReply'] = _INFERENCEREPLY
+DESCRIPTOR.message_types_by_name['TrackerResult'] = _TRACKERRESULT
+DESCRIPTOR.message_types_by_name['TrackerResults'] = _TRACKERRESULTS
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 InferenceRequest = _reflection.GeneratedProtocolMessageType('InferenceRequest', (_message.Message,), {
@@ -196,6 +285,20 @@ InferenceReply = _reflection.GeneratedProtocolMessageType('InferenceReply', (_me
   })
 _sym_db.RegisterMessage(InferenceReply)
 
+TrackerResult = _reflection.GeneratedProtocolMessageType('TrackerResult', (_message.Message,), {
+  'DESCRIPTOR' : _TRACKERRESULT,
+  '__module__' : 'service_pb2'
+  # @@protoc_insertion_point(class_scope:TrackerResult)
+  })
+_sym_db.RegisterMessage(TrackerResult)
+
+TrackerResults = _reflection.GeneratedProtocolMessageType('TrackerResults', (_message.Message,), {
+  'DESCRIPTOR' : _TRACKERRESULTS,
+  '__module__' : 'service_pb2'
+  # @@protoc_insertion_point(class_scope:TrackerResults)
+  })
+_sym_db.RegisterMessage(TrackerResults)
+
 
 
 _DETECTOR = _descriptor.ServiceDescriptor(
@@ -205,8 +308,8 @@ _DETECTOR = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=248,
-  serialized_end=309,
+  serialized_start=422,
+  serialized_end=483,
   methods=[
   _descriptor.MethodDescriptor(
     name='Inference',
