@@ -7,6 +7,9 @@ from absl import flags
 import numpy as np
 import tensorflow as tf
 
+tf.config.optimizer.set_jit(True)
+tf.config.optimizer.set_experimental_options({'auto_mixed_precision': True})
+
 FLAGS = flags.FLAGS
 _IMAGE_TYPE = tf.uint8
 _NUM_ITER = 100
@@ -45,6 +48,15 @@ def main(unused_argv):
 
   times = []
   num_images = 0
+  
+  # JIT warmup.
+  num_tries = 0
+  for filenames, images in images_ds.batch(FLAGS.batch_size).take(_NUM_ITER):
+    num_tries += 1
+    if num_tries >= 5:
+      continue
+    _ = model_fn(images)
+
   for filenames, images in images_ds.batch(FLAGS.batch_size).take(_NUM_ITER):
     start = time.time()
     _ = model_fn(images)
