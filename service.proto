@@ -26,3 +26,14 @@ message BoundingBox {
 message InferenceReply {
   repeated BoundingBox detections = 1;
 }
+
+message TrackerResult {
+  BoundingBox detection = 1;
+  int64 sequence_id = 2;
+  int64 sequence_length = 3;
+}
+
+message TrackerResults {
+  string file_path = 1;
+  repeated TrackerResult tracker_results = 2;
+}
