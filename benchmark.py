@@ -11,14 +11,16 @@ tf.config.optimizer.set_jit(True)
 tf.config.optimizer.set_experimental_options({'auto_mixed_precision': True})
 
 FLAGS = flags.FLAGS
-_IMAGE_TYPE = tf.uint8
-_NUM_ITER = 100
 
 flags.DEFINE_string('model_path', None, 'Model path')
 flags.DEFINE_string('image_path', None, 'Image path')
 flags.DEFINE_integer('batch_size', 1, 'batch size')
-flags.DEFINE_bool('is_tf_model', False,
-                  'If True, assumes the model is a TF model with signatures.')
+flags.DEFINE_string(
+  'model_signature', 'serving_default', 'Signature of the model to run.')
+
+_DEFAULT_SIGNATURE = 'serving_default'
+_IMAGE_TYPE = tf.uint8
+_NUM_ITER = 100
 
 def parse_image(filename):
   image = tf.io.read_file(filename)
@@ -39,18 +41,21 @@ def main(unused_argv):
   ).prefetch(tf.data.AUTOTUNE)
 
   start = time.time()
-  model = tf.saved_model.load(FLAGS.model_path)
+  model = tf.saved_model.load(
+    FLAGS.model_path,
+    options=tf.saved_model.LoadOptions(allow_partial_checkpoint=True))
 
-  if FLAGS.is_tf_model:
-    serving = model.signatures['serving_default']
+  try:
+    serving_fn = model.signatures[FLAGS.model_signature]
+  except KeyError:
+    raise KeyError(
+      f'Model does not have signautre {FLAGS.model_signature}. '
+      f'Available signatures: {list(model.signatures)}')
 
   @tf.function(input_signature=[
     tf.TensorSpec((None, None, None, 3), _IMAGE_TYPE)])
   def model_fn(data):
-    if FLAGS.is_tf_model:
-      return serving(data)
-    else:
-      return model(data)
+    return serving_fn(data)
 
   print(f'model loaded in {time.time() - start:.3f}s')
 

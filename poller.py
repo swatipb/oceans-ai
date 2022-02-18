@@ -3,12 +3,15 @@
 Usage:
   python poller.py path/to/watch
 """
+import collections
 import logging
 import multiprocessing
+import os
 import sys
 import time
-import cots_tracker
-import os
+
+from absl import app
+from absl import flags
 
 from google.protobuf import text_format
 import grpc
@@ -17,6 +20,15 @@ import service_pb2_grpc
 import tensorflow as tf
 from watchdog import events
 from watchdog import observers
+
+import cots_tracker
+
+FLAGS = flags.FLAGS
+
+flags.DEFINE_string('watch_path', None, 'Path to watch for new images.')
+flags.DEFINE_string('output_file', None, 'A csv file to append new detections.')
+flags.DEFINE_integer(
+  'batch_size', 1, 'number of images to send for inference at once.')
 
 _MAX_MESSAGE_LENGTH = 100 * 1024 * 1024  # 100 MiB
 _IMAGE_TYPE = tf.uint8
@@ -36,7 +48,7 @@ def data_gen():
 def parse_image(filename):
   image = tf.io.read_file(filename)
   image = tf.io.decode_jpeg(image)
-  image = tf.image.resize(image, [1280, 720], preserve_aspect_ratio=True)
+  image = tf.image.resize(image, [720, 1280], preserve_aspect_ratio=True)
   if _IMAGE_TYPE == tf.float32:
     image = tf.image.convert_image_dtype(image, tf.float32)
   else:
@@ -45,11 +57,11 @@ def parse_image(filename):
 
 
 def get_ordered_filename_to_detections(inference_response):
-  result = defaultdict(lambda: [])
+  result = collections.defaultdict(lambda: [])
   for detection in inference_response.detections:
     head, tail = os.path.split(detection.file_path)
     result[tail].append(detection)
-  return OrderedDict(sorted(result.items()))
+  return collections.OrderedDict(sorted(result.items()))
 
 
 def format_tracker_response(tracker_results):
@@ -63,8 +75,8 @@ def format_tracker_response(tracker_results):
                          str(entry.detection.left),
                          str(entry.detection.width),
                          str(entry.detection.height)]
-    result += ", { " + ",".join(detection_columns) + "}"
-  result += ","
+    result += ', { ' + ','.join(detection_columns) + '}'
+  result += ','
   return result
 
 
@@ -79,7 +91,7 @@ class Handler(events.FileSystemEventHandler):
     tx.send_bytes(bytes(event.src_path, encoding='utf-8'))
 
 
-if __name__ == '__main__':
+def main(unused_argv):
   logging.basicConfig(
       level=logging.INFO,
       format='%(asctime)s - %(message)s',
@@ -88,8 +100,8 @@ if __name__ == '__main__':
     print('Output csv filepath not passed')
     sys.exit()
 
-  output_filepath = sys.argv[1]
-  path = sys.argv[2] if len(sys.argv) > 2 else '.'
+  output_filepath = FLAGS.output_file
+  path = FLAGS.watch_path
   event_handler = Handler()
   observer = observers.Observer()
   observer.schedule(event_handler, path, recursive=True)
@@ -112,7 +124,7 @@ if __name__ == '__main__':
     try:
       while True:
         time.sleep(1)
-        for data in image_ds.repeat().batch(1).take(1):
+        for data in image_ds.repeat().batch(FLAGS.batch_size).take(1):
           try:
             response = stub.Inference(
                 service_pb2.InferenceRequest(
@@ -139,3 +151,6 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
       observer.stop()
     observer.join()
+
+if __name__ == '__main__':
+    app.run(main)

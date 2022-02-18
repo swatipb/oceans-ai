@@ -2,14 +2,23 @@
 from concurrent import futures
 import logging
 
+from absl import app
+from absl import flags
+
 import grpc
 import numpy as np
 import service_pb2
 import service_pb2_grpc
 import tensorflow as tf
 
-_MODEL_DIR = 'cots_efficientdet_d0/output/saved_model'
-# _MODEL_DIR = 'cots_mobilenet_v2_ssd/saved_model'
+FLAGS = flags.FLAGS
+
+flags.DEFINE_string('model_path', None, 'Path to inference SavedModel.')
+flags.DEFINE_string('model_signature', 'serving_default',
+                  'Signature of the model to run.')
+flags.DEFINE_float(
+  'detection_threshold', 0.2, 'Detection confidence threshold to return.')
+
 _OUTPUT_NAMES = (
     'detection_anchor_indices',
     'detection_boxes',
@@ -20,10 +29,9 @@ _OUTPUT_NAMES = (
     'raw_detection_boxes',
     'raw_detection_scores',
 )
-_DETECTION_THRESHOLD = 0.05
+
 _MAX_MESSAGE_LENGTH = 100 * 1024 * 1024  # 100 MiB
 _IMAGE_TYPE = tf.uint8
-
 
 class Detector(service_pb2_grpc.Detector):
   """Detector service. gets serizliaed tensors and returns detecion results."""
@@ -32,9 +40,25 @@ class Detector(service_pb2_grpc.Detector):
     super().__init__()
     self._model = model
 
+    try:
+      serving_fn = model.signatures[FLAGS.model_signature]
+    except KeyError:
+      raise KeyError(
+        f'Model does not have signautre {FLAGS.model_signature}. '
+        f'Available signatures: {list(model.signatures)}')
+
+    @tf.function(input_signature=[
+      tf.TensorSpec((None, None, None, 3), _IMAGE_TYPE)])
+    def model_fn(data):
+      return serving_fn(data)
+
+    self._model_fn = model_fn
+
+
   def Inference(self, request, context):
     images = tf.io.parse_tensor(request.data, _IMAGE_TYPE)
-    detections = self._model(images)
+    print(f'Inference request with tensor shape: {images.shape}')
+    detections = self._model_fn(images)
     result = service_pb2.InferenceReply()
     img_h, img_w = images.shape[1:3]
 
@@ -43,11 +67,12 @@ class Detector(service_pb2_grpc.Detector):
     detection_classes = detections['detection_classes'].numpy().astype(np.int32)
     detection_scores = detections['detection_scores'].numpy()
 
+    print(f'Result shape: {detections["detection_boxes"].shape}')
+
     print('Detected:', num_detections)
     for file_idx, file_path in enumerate(request.file_paths):
       scores = detection_scores[file_idx]
-      print(scores)
-      valid_indices = detection_scores[file_idx, :] >= _DETECTION_THRESHOLD
+      valid_indices = detection_scores[file_idx, :] >= FLAGS.detection_threshold
       scores = scores[valid_indices]
       classes = detection_classes[file_idx, valid_indices]
       bbox = detection_boxes[file_idx, valid_indices, :]
@@ -68,7 +93,13 @@ class Detector(service_pb2_grpc.Detector):
 
 def serve():
   """Starts gRPC service."""
-  model = tf.saved_model.load(_MODEL_DIR)
+  options = tf.saved_model.LoadOptions(
+    allow_partial_checkpoint=True,
+    experimental_skip_checkpoint=True
+  )
+  model = tf.saved_model.load(
+    FLAGS.model_path,
+    options=tf.saved_model.LoadOptions(allow_partial_checkpoint=True))
   server = grpc.server(
       futures.ThreadPoolExecutor(max_workers=1),
       options=[
@@ -81,6 +112,11 @@ def serve():
   server.wait_for_termination()
 
 
-if __name__ == '__main__':
+def main(unused_argv):
+  tf.config.optimizer.set_jit(True)
+  tf.config.optimizer.set_experimental_options({'auto_mixed_precision': True})
   logging.basicConfig()
   serve()
+
+if __name__ == '__main__':
+    app.run(main)
