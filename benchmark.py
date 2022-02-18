@@ -17,6 +17,8 @@ _NUM_ITER = 100
 flags.DEFINE_string('model_path', None, 'Model path')
 flags.DEFINE_string('image_path', None, 'Image path')
 flags.DEFINE_integer('batch_size', 1, 'batch size')
+flags.DEFINE_bool('is_tf_model', True,
+                  'If True, assumes the model is a TF model with signatures.')
 
 def parse_image(filename):
   image = tf.io.read_file(filename)
@@ -39,10 +41,16 @@ def main(unused_argv):
   start = time.time()
   model = tf.saved_model.load(FLAGS.model_path)
 
+  if FLAGS.is_tf_model:
+    serving = model.signatures['serving_default']
+
   @tf.function(input_signature=[
     tf.TensorSpec((None, None, None, 3), _IMAGE_TYPE)])
   def model_fn(data):
-    return model(data)
+    if FLAGS.is_tf_model:
+      return serving(data)
+    else:
+      return model(data)
 
   print(f'model loaded in {time.time() - start:.3f}s')
 
