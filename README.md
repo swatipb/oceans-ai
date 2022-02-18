@@ -5,13 +5,19 @@
 Terminal 1
 
 ```sh
-$ python poller.py path/to/directory
+python poller.py \
+  --watch_path=path/to/directory --output_file=path/to/output.csv \
+  --batch_size=8
 ```
 
 Terminal 2 (On the same machine)
 
+The script currently recognizes the models from TF OD API, or the ones that
+have the same signature.
+
 ```sh
-$ python serving.py
+python serving.py \
+  --model_path=path/to/saved_model --model_signature="serving_default"
 ```
 
 To update the service proto python files, run
@@ -39,7 +45,8 @@ Simply measure the model's performance.
 
 ```sh
 python benchmark.py \
-  --model_path=path/to/model --image_path=path/to/image/dir --batch_size=1
+  --model_path=path/to/model --image_path=path/to/image/dir --batch_size=1 \
+  --model_signature="serving_default"
 ```
 
 ## TODO
