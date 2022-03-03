@@ -69,6 +69,13 @@ class Detector(service_pb2_grpc.Detector):
 
     print(f'Result shape: {detections["detection_boxes"].shape}')
 
+    # TODO: Move this to the poller, which knows the actual input image size.
+    # TODO: Don't hardcode these values. Currently assumes 1920x1080 images are
+    # vertically and symmetrically padded for a model that expects 1920x1920
+    # input.
+    actual_image_height = 1080
+    model_y_padding = (1920 - actual_image_height) / 2 / 1920
+
     print('Detected:', num_detections)
     for file_idx, file_path in enumerate(request.file_paths):
       scores = detection_scores[file_idx]
@@ -78,14 +85,18 @@ class Detector(service_pb2_grpc.Detector):
       bbox = detection_boxes[file_idx, valid_indices, :]
 
       for i, pos in enumerate(bbox):
+        box_x1 = pos[1]
+        box_y1 = (pos[0] - model_y_padding) / (1 - 2 * model_y_padding)
+        box_x2 = pos[3]
+        box_y2 = (pos[2] - model_y_padding) / (1 - 2 * model_y_padding)
         detection = service_pb2.BoundingBox(
             file_path=file_path,
             class_id=classes[i],
             score=scores[i],
-            left=pos[0] * img_w,
-            top=pos[1] * img_h,
-            width=(pos[2] - pos[0]) * img_w,
-            height=(pos[3] - pos[1]) * img_h,
+            left=box_x1 * img_w,
+            top=box_y1 * actual_image_height,
+            width=(box_x2 - box_x1) * img_w,
+            height=(box_y2 - box_y1) * actual_image_height,
         )
         result.detections.append(detection)
     return result

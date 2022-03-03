@@ -48,7 +48,7 @@ def data_gen():
 def parse_image(filename):
   image = tf.io.read_file(filename)
   image = tf.io.decode_jpeg(image)
-  image = tf.image.resize(image, [720, 1280], preserve_aspect_ratio=True)
+  image = tf.image.resize_with_pad(image, 1920, 1920)
   if _IMAGE_TYPE == tf.float32:
     image = tf.image.convert_image_dtype(image, tf.float32)
   else:
