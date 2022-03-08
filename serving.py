@@ -1,9 +1,10 @@
 """Inference server. Currently works with TF OD API."""
 from concurrent import futures
-import logging
+import time
 
 from absl import app
 from absl import flags
+from absl import logging
 
 import grpc
 import numpy as np
@@ -15,9 +16,9 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('model_path', None, 'Path to inference SavedModel.')
 flags.DEFINE_string('model_signature', 'serving_default',
-                  'Signature of the model to run.')
-flags.DEFINE_float(
-  'detection_threshold', 0.2, 'Detection confidence threshold to return.')
+                    'Signature of the model to run.')
+flags.DEFINE_float('detection_threshold', 0.2,
+                   'Detection confidence threshold to return.')
 
 _OUTPUT_NAMES = (
     'detection_anchor_indices',
@@ -33,6 +34,7 @@ _OUTPUT_NAMES = (
 _MAX_MESSAGE_LENGTH = 100 * 1024 * 1024  # 100 MiB
 _IMAGE_TYPE = tf.uint8
 
+
 class Detector(service_pb2_grpc.Detector):
   """Detector service. gets serizliaed tensors and returns detecion results."""
 
@@ -43,23 +45,22 @@ class Detector(service_pb2_grpc.Detector):
     try:
       serving_fn = model.signatures[FLAGS.model_signature]
     except KeyError:
-      raise KeyError(
-        f'Model does not have signautre {FLAGS.model_signature}. '
-        f'Available signatures: {list(model.signatures)}')
+      raise KeyError(f'Model does not have signautre {FLAGS.model_signature}. '
+                     f'Available signatures: {list(model.signatures)}')
 
-    @tf.function(input_signature=[
-      tf.TensorSpec((None, None, None, 3), _IMAGE_TYPE)])
+    @tf.function(
+        input_signature=[tf.TensorSpec((None, None, None, 3), _IMAGE_TYPE)])
     def model_fn(data):
       return serving_fn(data)
 
     self._model_fn = model_fn
-
 
   def Inference(self, request, context):
     images = tf.io.parse_tensor(request.data, _IMAGE_TYPE)
     print(f'Inference request with tensor shape: {images.shape}')
     detections = self._model_fn(images)
     result = service_pb2.InferenceReply()
+    result.data = request.data
     img_h, img_w = images.shape[1:3]
 
     num_detections = detections['num_detections'].numpy().astype(np.int32)
@@ -67,14 +68,9 @@ class Detector(service_pb2_grpc.Detector):
     detection_classes = detections['detection_classes'].numpy().astype(np.int32)
     detection_scores = detections['detection_scores'].numpy()
 
-    print(f'Result shape: {detections["detection_boxes"].shape}')
-
-    # TODO: Move this to the poller, which knows the actual input image size.
-    # TODO: Don't hardcode these values. Currently assumes 1920x1080 images are
-    # vertically and symmetrically padded for a model that expects 1920x1920
-    # input.
-    actual_image_height = 1080
-    model_y_padding = (1920 - actual_image_height) / 2 / 1920
+    model_y_padding = (
+        (request.original_image_width - request.original_image_height) / 2 /
+        request.original_image_width)
 
     print('Detected:', num_detections)
     for file_idx, file_path in enumerate(request.file_paths):
@@ -94,9 +90,9 @@ class Detector(service_pb2_grpc.Detector):
             class_id=classes[i],
             score=scores[i],
             left=box_x1 * img_w,
-            top=box_y1 * actual_image_height,
+            top=box_y1 * request.original_image_height,
             width=(box_x2 - box_x1) * img_w,
-            height=(box_y2 - box_y1) * actual_image_height,
+            height=(box_y2 - box_y1) * request.original_image_height,
         )
         result.detections.append(detection)
     return result
@@ -105,12 +101,14 @@ class Detector(service_pb2_grpc.Detector):
 def serve():
   """Starts gRPC service."""
   options = tf.saved_model.LoadOptions(
-    allow_partial_checkpoint=True,
-    experimental_skip_checkpoint=True
-  )
+      allow_partial_checkpoint=True, experimental_skip_checkpoint=True)
+  start = time.time()
   model = tf.saved_model.load(
-    FLAGS.model_path,
-    options=tf.saved_model.LoadOptions(allow_partial_checkpoint=True))
+      FLAGS.model_path,
+      options=tf.saved_model.LoadOptions(allow_partial_checkpoint=True))
+  logging.info('Model loading done in %.2fs. Inference server is ready.',
+               time.time() - start)
+
   server = grpc.server(
       futures.ThreadPoolExecutor(max_workers=1),
       options=[
@@ -126,8 +124,8 @@ def serve():
 def main(unused_argv):
   tf.config.optimizer.set_jit(True)
   tf.config.optimizer.set_experimental_options({'auto_mixed_precision': True})
-  logging.basicConfig()
   serve()
 
+
 if __name__ == '__main__':
-    app.run(main)
+  app.run(main)

@@ -1,19 +1,25 @@
-"""Watches specific directory and sends new file to detector service.
+r"""Watches specific directory and sends new file to detector service.
 
 Usage:
-  python poller.py path/to/watch
+  python poller.py --watch_path=path/to/watch --output_file=path/to/output.csv \
+    --batch_size=8
+
+  # disabling resize
+  python poller.py --watch_path=path/to/watch --output_file=path/to/output.csv \
+    --batch_size=8 --noresize
 """
 import collections
-import logging
 import multiprocessing
 import os
+import queue
 import sys
 import time
 
 from absl import app
 from absl import flags
+from absl import logging
 
-from google.protobuf import text_format
+import cots_tracker
 import grpc
 import service_pb2
 import service_pb2_grpc
@@ -21,66 +27,85 @@ import tensorflow as tf
 from watchdog import events
 from watchdog import observers
 
-import cots_tracker
-
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('watch_path', None, 'Path to watch for new images.')
 flags.DEFINE_string('output_file', None, 'A csv file to append new detections.')
-flags.DEFINE_integer(
-  'batch_size', 1, 'number of images to send for inference at once.')
+flags.DEFINE_integer('batch_size', 1,
+                     'number of images to send for inference at once.')
+flags.DEFINE_boolean(
+    'resize', True,
+    'Whether to resize the image here. For some models, the resizing is done '
+    'on the model size so there is no need to resize in the poller.')
+flags.DEFINE_integer('resize_height', 1920, 'Height of the resized image.')
+flags.DEFINE_integer('resize_width', 1920, 'Width of the resized image.')
+
+flags.mark_flags_as_required(['watch_path', 'output_file'])
 
 _MAX_MESSAGE_LENGTH = 100 * 1024 * 1024  # 100 MiB
 _IMAGE_TYPE = tf.uint8
+_POLLER_TIMEOUT_SEC = 3
+_CLASS_ID_TO_LABEL = ('COTS',)
 
 # https://hub.docker.com/r/helmuthva/jetson-xavier-tensorflow-serving
 # https://velog.io/@canlion/tensorflow-2.x-od-api-tensorRT
-# TensorFlow & lower perf VS. PyTorch & high perf...
 
-rx, tx = multiprocessing.Pipe(duplex=False)
+file_queue = multiprocessing.Queue()
+
+image_shape = None
 
 
 def data_gen():
-  if rx.poll():
-    yield rx.recv_bytes()
+  try:
+    yield file_queue.get(timeout=_POLLER_TIMEOUT_SEC)
+  except queue.Empty:
+    pass  # Allow empty dataset to be passed to prevent process from blocking
 
 
 def parse_image(filename):
+  """Reads an image."""
   image = tf.io.read_file(filename)
   image = tf.io.decode_jpeg(image)
-  image = tf.image.resize_with_pad(image, 1920, 1920)
+  if FLAGS.resize:
+    image = tf.image.resize_with_pad(image, FLAGS.resize_height,
+                                     FLAGS.resize_width)
   if _IMAGE_TYPE == tf.float32:
     image = tf.image.convert_image_dtype(image, tf.float32)
-  else:
+  elif FLAGS.resize:  # only convert back to uint8 when the mage is resized.
     image = tf.cast(tf.round(image), _IMAGE_TYPE)
   return filename, image
 
 
-def get_ordered_filename_to_detections(inference_response):
+def get_ordered_filename_to_detections(inference_response, original_filenames):
   result = collections.defaultdict(lambda: [])
+  result.update({os.path.basename(name): [] for name in original_filenames})
   for detection in inference_response.detections:
-    head, tail = os.path.split(detection.file_path)
-    result[tail].append(detection)
+    basename = os.path.basename(detection.file_path)
+    result[basename].append(detection)
   return collections.OrderedDict(sorted(result.items()))
 
 
 def format_tracker_response(tracker_results):
+  """Formats tracker response in csv format."""
   result = tracker_results.file_path
   for entry in tracker_results.tracker_results:
-    detection_columns = [str(entry.detection.class_id),
-                         str(entry.detection.score),
-                         str(entry.sequence_id),
-                         str(entry.sequence_length),
-                         str(entry.detection.top),
-                         str(entry.detection.left),
-                         str(entry.detection.width),
-                         str(entry.detection.height)]
+    detection_columns = [
+        _CLASS_ID_TO_LABEL[entry.detection.class_id],
+        str(entry.detection.score),
+        str(entry.sequence_id),
+        str(entry.sequence_length),
+        str(entry.detection.top),
+        str(entry.detection.left),
+        str(entry.detection.width),
+        str(entry.detection.height)
+    ]
     result += ', { ' + ','.join(detection_columns) + '}'
   result += ','
   return result
 
 
 class Handler(events.FileSystemEventHandler):
+  """Event handler for newly created images."""
 
   def on_created(self, event):
     if event.is_directory:
@@ -88,30 +113,66 @@ class Handler(events.FileSystemEventHandler):
     print('detected', event.src_path)
     if event.src_path[-4:] != '.jpg':
       return
-    tx.send_bytes(bytes(event.src_path, encoding='utf-8'))
+    global image_shape
+    if image_shape is None:
+      image = tf.io.read_file(event.src_path)
+      image = tf.io.decode_jpeg(image)
+      image_shape = image.numpy().shape
+      print(image_shape)
+    file_queue.put(event.src_path)
 
 
-def main(unused_argv):
-  logging.basicConfig(
-      level=logging.INFO,
-      format='%(asctime)s - %(message)s',
-      datefmt='%Y-%m-%d %H:%M:%S')
-  if (len(sys.argv) < 2):
-    print('Output csv filepath not passed')
-    sys.exit()
+def dispatch_inference_and_track(data, tracker, stub):
+  """Dispatches a single inference request and runs tracker."""
+  inference_start = time.time()
+  try:
+    request = service_pb2.InferenceRequest(
+        file_paths=list(data[0].numpy()),
+        data=tf.io.serialize_tensor(data[1]).numpy(),
+        original_image_height=image_shape[0],
+        original_image_width=image_shape[1],
+    )
+    response = stub.Inference(request)
+  except grpc.RpcError as e:
+    logging.error('gRPC error: %s', str(e))
+    return
+  finally:
+    logging.info('Inference: %.2fms', (time.time() - inference_start) * 1000)
 
-  output_filepath = FLAGS.output_file
-  path = FLAGS.watch_path
-  event_handler = Handler()
-  observer = observers.Observer()
-  observer.schedule(event_handler, path, recursive=True)
-  observer.start()
+  postprocessing_start = time.time()
+  filename_to_detections = get_ordered_filename_to_detections(
+      response, request.file_paths)
+  output_lines = []
+
+  for filename, detections in filename_to_detections.items():
+    if not detections:
+      output_lines.append(filename + ',')
+    else:
+      tracker_results = tracker.process_frame(filename, detections)
+      output_lines.append(format_tracker_response(tracker_results))
+      logging.info('Tracking: %.2fms',
+                   (time.time() - postprocessing_start) * 1000)
+  output_lines.append('')
+
+  try:
+    with open(FLAGS.output_file, 'a') as output_file:
+      output_file.write('\n'.join(output_lines))
+  except (OSError, IOError) as e:
+    logging.error('Error writing to file %s', e.strerror)
+
+
+def poller():
+  """Runs main poller loop that fetches files and run inference."""
   ds_counter = tf.data.Dataset.from_generator(
       data_gen,
       output_types=tf.string,
       output_shapes=(),
   )
   image_ds = ds_counter.map(parse_image)
+
+  tracker = cots_tracker.CotsTracker()
+  image_count = 0
+  elapsed_sec = 0
 
   with grpc.insecure_channel(
       'localhost:50051',
@@ -120,37 +181,29 @@ def main(unused_argv):
           ('grpc.max_receive_message_length', _MAX_MESSAGE_LENGTH),
       ]) as channel:
     stub = service_pb2_grpc.DetectorStub(channel)
-    tracker = cots_tracker.CotsTracker()
-    try:
-      while True:
-        time.sleep(1)
-        for data in image_ds.repeat().batch(FLAGS.batch_size).take(1):
-          try:
-            response = stub.Inference(
-                service_pb2.InferenceRequest(
-                    file_paths=list(data[0].numpy()),
-                    data=tf.io.serialize_tensor(data[1]).numpy()))
-            print(type(response), text_format.MessageToString(response))
-            filename_to_detections = get_ordered_filename_to_detections(response)
-            try:
-              output_file = open(output_filepath, 'a')
-              for filename, detections in filename_to_detections.items():
-                if not detections:
-                  output_file.write(filename + ',')
-                else:
-                  tracker_results = tracker.process_frame(
-                      filename, detections)
-                  result_as_string = format_tracker_response(tracker_results)
-                  output_file.write(result_as_string + '\n')
-              output_file.close()
-            except (OSError, IOError) as e:
-              print('Error writing to file {0}'.format(e.strerror))            
-          except grpc.RpcError as e:
-            print(e)
+    while True:
+      start = time.time()
+      for data in image_ds.repeat().batch(FLAGS.batch_size):
+        dispatch_inference_and_track(data, tracker, stub)
+        elapsed_sec += time.time() - start
+        image_count += data[0].numpy().size
+        logging.info('Total inference: %d, FPS: %.2f', image_count,
+                     image_count / elapsed_sec)
+        start = time.time()
 
-    except KeyboardInterrupt:
-      observer.stop()
-    observer.join()
+
+def main(unused_argv):
+  event_handler = Handler()
+  observer = observers.Observer()
+  observer.schedule(event_handler, FLAGS.watch_path, recursive=True)
+  observer.start()
+
+  try:
+    poller()
+  except KeyboardInterrupt:
+    observer.stop()
+  observer.join()
+
 
 if __name__ == '__main__':
-    app.run(main)
+  app.run(main)

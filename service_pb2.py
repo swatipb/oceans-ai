@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\rservice.proto\"4\n\x10InferenceRequest\x12\x12\n\nfile_paths\x18\x01 \x03(\t\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c\"{\n\x0b\x42oundingBox\x12\x11\n\tfile_path\x18\x01 \x01(\t\x12\x10\n\x08\x63lass_id\x18\x02 \x01(\x05\x12\r\n\x05score\x18\x03 \x01(\x02\x12\x0c\n\x04left\x18\x04 \x01(\x02\x12\x0b\n\x03top\x18\x05 \x01(\x02\x12\r\n\x05width\x18\x06 \x01(\x02\x12\x0e\n\x06height\x18\x07 \x01(\x02\"2\n\x0eInferenceReply\x12 \n\ndetections\x18\x01 \x03(\x0b\x32\x0c.BoundingBox\"^\n\rTrackerResult\x12\x1f\n\tdetection\x18\x01 \x01(\x0b\x32\x0c.BoundingBox\x12\x13\n\x0bsequence_id\x18\x02 \x01(\x03\x12\x17\n\x0fsequence_length\x18\x03 \x01(\x03\"L\n\x0eTrackerResults\x12\x11\n\tfile_path\x18\x01 \x01(\t\x12\'\n\x0ftracker_results\x18\x02 \x03(\x0b\x32\x0e.TrackerResult2=\n\x08\x44\x65tector\x12\x31\n\tInference\x12\x11.InferenceRequest\x1a\x0f.InferenceReply\"\x00\x62\x06proto3'
+  serialized_pb=b'\n\rservice.proto\"q\n\x10InferenceRequest\x12\x12\n\nfile_paths\x18\x01 \x03(\t\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c\x12\x1d\n\x15original_image_height\x18\x03 \x01(\x05\x12\x1c\n\x14original_image_width\x18\x04 \x01(\x05\"{\n\x0b\x42oundingBox\x12\x11\n\tfile_path\x18\x01 \x01(\t\x12\x10\n\x08\x63lass_id\x18\x02 \x01(\x05\x12\r\n\x05score\x18\x03 \x01(\x02\x12\x0c\n\x04left\x18\x04 \x01(\x02\x12\x0b\n\x03top\x18\x05 \x01(\x02\x12\r\n\x05width\x18\x06 \x01(\x02\x12\x0e\n\x06height\x18\x07 \x01(\x02\"@\n\x0eInferenceReply\x12 \n\ndetections\x18\x01 \x03(\x0b\x32\x0c.BoundingBox\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c\"^\n\rTrackerResult\x12\x1f\n\tdetection\x18\x01 \x01(\x0b\x32\x0c.BoundingBox\x12\x13\n\x0bsequence_id\x18\x02 \x01(\x03\x12\x17\n\x0fsequence_length\x18\x03 \x01(\x03\"L\n\x0eTrackerResults\x12\x11\n\tfile_path\x18\x01 \x01(\t\x12\'\n\x0ftracker_results\x18\x02 \x03(\x0b\x32\x0e.TrackerResult2=\n\x08\x44\x65tector\x12\x31\n\tInference\x12\x11.InferenceRequest\x1a\x0f.InferenceReply\"\x00\x62\x06proto3'
 )
 
 
@@ -47,6 +47,20 @@ _INFERENCEREQUEST = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='original_image_height', full_name='InferenceRequest.original_image_height', index=2,
+      number=3, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='original_image_width', full_name='InferenceRequest.original_image_width', index=3,
+      number=4, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -60,7 +74,7 @@ _INFERENCEREQUEST = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=17,
-  serialized_end=69,
+  serialized_end=130,
 )
 
 
@@ -133,8 +147,8 @@ _BOUNDINGBOX = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=71,
-  serialized_end=194,
+  serialized_start=132,
+  serialized_end=255,
 )
 
 
@@ -153,6 +167,13 @@ _INFERENCEREPLY = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='data', full_name='InferenceReply.data', index=1,
+      number=2, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -165,8 +186,8 @@ _INFERENCEREPLY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=196,
-  serialized_end=246,
+  serialized_start=257,
+  serialized_end=321,
 )
 
 
@@ -211,8 +232,8 @@ _TRACKERRESULT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=248,
-  serialized_end=342,
+  serialized_start=323,
+  serialized_end=417,
 )
 
 
@@ -250,8 +271,8 @@ _TRACKERRESULTS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=344,
-  serialized_end=420,
+  serialized_start=419,
+  serialized_end=495,
 )
 
 _INFERENCEREPLY.fields_by_name['detections'].message_type = _BOUNDINGBOX
@@ -308,8 +329,8 @@ _DETECTOR = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=422,
-  serialized_end=483,
+  serialized_start=497,
+  serialized_end=558,
   methods=[
   _descriptor.MethodDescriptor(
     name='Inference',

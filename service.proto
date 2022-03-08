@@ -10,6 +10,8 @@ message InferenceRequest {
   repeated string file_paths = 1;
   // A serialized tensor, directly using tf.io.serialize_tensor API.
   bytes data = 2;
+  int32 original_image_height = 3;
+  int32 original_image_width = 4;
 }
 
 message BoundingBox {
@@ -25,6 +27,8 @@ message BoundingBox {
 // The response message containing the greetings
 message InferenceReply {
   repeated BoundingBox detections = 1;
+  // A serialized tensor, directly using tf.io.serialize_tensor API.
+  bytes data = 2;
 }
 
 message TrackerResult {
