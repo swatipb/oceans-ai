@@ -68,9 +68,13 @@ class Detector(service_pb2_grpc.Detector):
     detection_classes = detections['detection_classes'].numpy().astype(np.int32)
     detection_scores = detections['detection_scores'].numpy()
 
-    model_y_padding = (
-        (request.original_image_width - request.original_image_height) / 2 /
-        request.original_image_width)
+    # Temporarily disable padding compensation because the current model will
+    # handle this.
+    #
+    # model_y_padding = (
+    #     (request.original_image_width - request.original_image_height) / 2 /
+    #     request.original_image_width)
+    model_y_padding = 0
 
     print('Detected:', num_detections)
     for file_idx, file_path in enumerate(request.file_paths):
@@ -100,12 +104,11 @@ class Detector(service_pb2_grpc.Detector):
 
 def serve():
   """Starts gRPC service."""
-  options = tf.saved_model.LoadOptions(
-      allow_partial_checkpoint=True, experimental_skip_checkpoint=True)
+  # These are not available in TF 2.5.
+  # options = tf.saved_model.LoadOptions(
+  #     allow_partial_checkpoint=True, experimental_skip_checkpoint=True)
   start = time.time()
-  model = tf.saved_model.load(
-      FLAGS.model_path,
-      options=tf.saved_model.LoadOptions(allow_partial_checkpoint=True))
+  model = tf.saved_model.load(FLAGS.model_path)
   logging.info('Model loading done in %.2fs. Inference server is ready.',
                time.time() - start)
 

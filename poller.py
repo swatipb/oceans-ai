@@ -34,7 +34,7 @@ flags.DEFINE_string('output_file', None, 'A csv file to append new detections.')
 flags.DEFINE_integer('batch_size', 1,
                      'number of images to send for inference at once.')
 flags.DEFINE_boolean(
-    'resize', True,
+    'resize', False,
     'Whether to resize the image here. For some models, the resizing is done '
     'on the model size so there is no need to resize in the poller.')
 flags.DEFINE_integer('resize_height', 1920, 'Height of the resized image.')
@@ -107,7 +107,7 @@ def format_tracker_response(tracker_results):
 class Handler(events.FileSystemEventHandler):
   """Event handler for newly created images."""
 
-  def on_created(self, event):
+  def on_closed(self, event):
     if event.is_directory:
       return
     print('detected', event.src_path)
