@@ -107,7 +107,7 @@ def format_tracker_response(tracker_results):
 class Handler(events.FileSystemEventHandler):
   """Event handler for newly created images."""
 
-  def on_closed(self, event):
+  def on_created(self, event):
     if event.is_directory:
       return
     print('detected', event.src_path)
