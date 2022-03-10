@@ -55,6 +55,12 @@ class Detector(service_pb2_grpc.Detector):
 
     self._model_fn = model_fn
 
+    logging.info('Warming up..')
+
+    # Warm-up. Model will reduce to actual batch size and resize to required input size.
+    for i in range(10):
+      self._model_fn(tf.zeros((16, 16, 16, 3), dtype=tf.uint8))
+
   def Inference(self, request, context):
     images = tf.io.parse_tensor(request.data, _IMAGE_TYPE)
     print(f'Inference request with tensor shape: {images.shape}')
@@ -109,8 +115,6 @@ def serve():
   #     allow_partial_checkpoint=True, experimental_skip_checkpoint=True)
   start = time.time()
   model = tf.saved_model.load(FLAGS.model_path)
-  logging.info('Model loading done in %.2fs. Inference server is ready.',
-               time.time() - start)
 
   server = grpc.server(
       futures.ThreadPoolExecutor(max_workers=1),
@@ -119,6 +123,9 @@ def serve():
           ('grpc.max_receive_message_length', _MAX_MESSAGE_LENGTH),
       ])
   service_pb2_grpc.add_DetectorServicer_to_server(Detector(model), server)
+  logging.info('Model loading done in %.2fs. Inference server is ready.',
+               time.time() - start)
+
   server.add_insecure_port('[::]:50051')
   server.start()
   server.wait_for_termination()

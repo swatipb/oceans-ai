@@ -24,6 +24,7 @@ import grpc
 import service_pb2
 import service_pb2_grpc
 import tensorflow as tf
+import time
 from watchdog import events
 from watchdog import observers
 
@@ -46,6 +47,7 @@ _MAX_MESSAGE_LENGTH = 100 * 1024 * 1024  # 100 MiB
 _IMAGE_TYPE = tf.uint8
 _POLLER_TIMEOUT_SEC = 3
 _CLASS_ID_TO_LABEL = ('COTS',)
+_MAX_DETECTION_FPS = 10
 
 # https://hub.docker.com/r/helmuthva/jetson-xavier-tensorflow-serving
 # https://velog.io/@canlion/tensorflow-2.x-od-api-tensorRT
@@ -65,7 +67,7 @@ def data_gen():
 def parse_image(filename):
   """Reads an image."""
   image = tf.io.read_file(filename)
-  image = tf.io.decode_jpeg(image)
+  image = tf.io.decode_jpeg(image, try_recover_truncated=True)
   if FLAGS.resize:
     image = tf.image.resize_with_pad(image, FLAGS.resize_height,
                                      FLAGS.resize_width)
@@ -107,19 +109,47 @@ def format_tracker_response(tracker_results):
 class Handler(events.FileSystemEventHandler):
   """Event handler for newly created images."""
 
+  def __init__(self):
+    # Keep track of the last N timestamps of frames that were forwarded to
+    # the detector, so we can try to reach a target FPS by dropping frames.
+    self._frame_timestamps = collections.deque()
+    self._max_frame_timestamps = 20
+    self._min_timestamp_diff = self._max_frame_timestamps / _MAX_DETECTION_FPS
+
   def on_created(self, event):
+    event_path = event.src_path
     if event.is_directory:
       return
-    print('detected', event.src_path)
-    if event.src_path[-4:] != '.jpg':
+    try:
+      if os.path.getsize(event_path) == 0:
+        print(f'Ignoring {event_path} - Empty file.')
+        return
+    except OSError:
+      print(f'Ignoring {event_path} - File was deleted.')
       return
+    if event_path[-4:] != '.jpg':
+      print(f'Ignoring {event_path} - Not a jpeg file.')
+      return
+
+    current_timestamp = time.time()
+    if len(self._frame_timestamps) == self._max_frame_timestamps:
+      if current_timestamp - self._frame_timestamps[0] < self._min_timestamp_diff:
+        print(f'Ignoring {event_path} - Too many frames per second.')
+        return
+
+    print(f'Reading {event_path}.')
+
+    self._frame_timestamps.append(current_timestamp)
+    while len(self._frame_timestamps) > self._max_frame_timestamps:
+      self._frame_timestamps.popleft()
+
     global image_shape
     if image_shape is None:
-      image = tf.io.read_file(event.src_path)
+      image = tf.io.read_file(event_path)
       image = tf.io.decode_jpeg(image)
       image_shape = image.numpy().shape
       print(image_shape)
-    file_queue.put(event.src_path)
+    file_queue.put(event_path)
 
 
 def dispatch_inference_and_track(data, tracker, stub):
