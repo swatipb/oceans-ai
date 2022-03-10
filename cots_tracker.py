@@ -10,6 +10,7 @@ from collections import defaultdict
 from object_detection.utils import np_box_ops
 
 class Detection(abc.ABC):
+
   def __init__(self, bounding_box, file_name, is_detected=True):
     self.bounding_box = bounding_box
     self.is_detected = is_detected
@@ -33,10 +34,8 @@ class RecentFrames(abc.ABC):
     return self.max_frames
 
 
-def clip_int(val, min_val, max_val):
-    return np.rint(np.clip(val, min_val, max_val))
-
 class CotsTracker(abc.ABC):
+  
   def __init__(self):
     # See get_tracked_persons() for the format of the contents of this
     # dictionary.
