@@ -100,9 +100,9 @@ class Detector(service_pb2_grpc.Detector):
             class_id=classes[i],
             score=scores[i],
             left=box_x1 * img_w,
-            top=box_y1 * request.original_image_height,
+            top=box_y1 * img_h,
             width=(box_x2 - box_x1) * img_w,
-            height=(box_y2 - box_y1) * request.original_image_height,
+            height=(box_y2 - box_y1) * img_h,
         )
         result.detections.append(detection)
     return result
