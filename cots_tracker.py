@@ -17,7 +17,7 @@ class CotsTracker(abc.ABC):
     self.sequence_id = 0
     # Map from sequence id to number of objects linked to the sequence.
     self.sequence_id_to_length = defaultdict(int)
-    self.min_iou = 0.55
+    self.min_iou = 0.4
 
   def _increment_sequence_length(self, sequence_id):
     self.sequence_id_to_length[sequence_id] += 1
@@ -74,5 +74,4 @@ class CotsTracker(abc.ABC):
     # Merge detections from this file into class map.
     for key,value in file_sequence_id_to_bbox.items():
       self.sequence_id_to_bbox[key].extend(value)
-    self._increment_sequence_length(detection_sequence_id)
     return results
